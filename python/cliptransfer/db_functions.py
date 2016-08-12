@@ -11,7 +11,6 @@ def copyFilesRecursive(con, src, dest, deleteSrc):
 
     if os.path.isdir(src):
         if not os.path.isdir(dest):
-            print "mkdir: " + dest
             os.makedirs(dest)
 
         files = os.listdir(src)
@@ -67,8 +66,19 @@ def cleanup(con, folder, d):
                     os.remove(file)
                 except IOError as e:
                     print "Error %s" % e.strerror
+                    try:
+                        mysql_insert(con, "ct_log", file, 1, e.strerror)
+                    except MySQLdb.Error, e:
+                        print "Error %d: %s" % (e.args[0], e.args[1])
+
                 except KeyboardInterrupt:
                     print "deletion process canceled!"
+
+                finally:
+                    try:
+                        mysql_insert(con, "ct_log", file, 2, "deleted successfully")
+                    except MySQLdb.Error, e:
+                        print "Error %d: %s" % (e.args[0], e.args[1])
 
     print str(i) + " deleted files"
 
