@@ -2,8 +2,10 @@ import MySQLdb
 import sys, os, shutil
 import time
 
+
 def helpme():
     print "tpsadmin.py [copy|move|delete] <src-folder> <dest-folder|days>"
+
 
 def copyFilesRecursive(con, src, dest, deleteSrc):
 
@@ -17,27 +19,28 @@ def copyFilesRecursive(con, src, dest, deleteSrc):
             copyFilesRecursive(con, os.path.join(src, f), os.path.join(dest, f), deleteSrc)
     else:
 
-
         try:
-            if mysql_check_entry(con, "finished", "file", src) == False:
+            if not mysql_check_entry(con, "ct_log", "file", src):
                 print "copy file " + src + " to " + dest
                 shutil.copyfile(src, dest)
 
         except shutil.Error as e:
+            mysql_insert(con, "ct_log", src, 1, e)
             print "Error: %s" % e
 
         except IOError as e:
             print "Error %s" % e.strerror
+            mysql_insert(con, "ct_log", src, 1, e.strerror)
 
-        except KeyboardInterrupt as e:
+        except KeyboardInterrupt:
             print "copy process canceled!"
             mysql_disconnect(con)
             exit(1)
 
         finally:
-            if mysql_check_entry(con, "finished", "file", src) == False:
+            if not mysql_check_entry(con, "ct_log", "file", src):
                 try:
-                    mysql_insert(con, "finished", src, 0)
+                    mysql_insert(con, "ct_log", src, 0, "copied successfully")
                 except MySQLdb.Error, e:
                     print "Error %d: %s" % (e.args[0], e.args[1])
         if deleteSrc == 1:
@@ -69,6 +72,7 @@ def cleanup(con, folder, d):
 
     print str(i) + " deleted files"
 
+
 def mysql_connect(mysql_server, mysql_port, mysql_db, mysql_user, mysql_pass):
     con = []
     try:
@@ -94,7 +98,7 @@ def mysql_select(con,statement):
     return results
 
 def mysql_check_entry(con, table, col, search):
-    stmt = "select " + col + " from " + table + " where " + col + " like '%" + search + "%'"
+    stmt = "select " + col + " from " + table + " where file_state=0 AND " + col + " like '%" + search + "%'"
     c = con.cursor()
     try:
         c.execute(stmt)
@@ -119,32 +123,44 @@ def mysql_check_if_table_exists (con, table):
         return False
 
 
-
 def mysql_table_setup(con):
 
     c = con.cursor()
-    create_finished = "CREATE TABLE IF NOT EXISTS `finished` (`ID` int(11) unsigned NOT NULL auto_increment,`ts` varchar(255), `file` MEDIUMTEXT , `file_state` tinyint(1), PRIMARY KEY  (`ID`))"
+    create_finished = "CREATE TABLE IF NOT EXISTS `ct_log` (`ID` int(11) unsigned NOT NULL auto_increment,`ts` varchar(255), `file` MEDIUMTEXT , `file_state` tinyint(1), `message` MEDIUMTEXT, PRIMARY KEY  (`ID`))"
+    create_ct_states = "CREATE TABLE IF NOT EXISTS `ct_states` (`ID` int(11) unsigned NOT NULL auto_increment,`state_description` varchar(255), `state` tinyint(1), PRIMARY KEY  (`ID`))"
     create_ct_service = "CREATE TABLE IF NOT EXISTS `ct_service` (`ID` int(11) unsigned NOT NULL auto_increment, `ts` varchar(255), `service` varchar(255) NOT NULL default '', `service_state` tinyint(1), PRIMARY KEY  (`ID`))"
     create_ct_mon = "CREATE TABLE IF NOT EXISTS `ct_mon` (`ID` int(11) unsigned NOT NULL auto_increment, `ts` varchar(255), `file` MEDIUMTEXT, `file_state` tinyint(1), `file_op_error` MEDIUMTEXT, PRIMARY KEY  (`ID`))"
     try:
-        if mysql_check_if_table_exists(con, "finished") == False:
+        if not mysql_check_if_table_exists(con, "ct_log"):
             c.execute(create_finished)
-        if mysql_check_if_table_exists(con, "ct_service") == False:
+        if not mysql_check_if_table_exists(con, "ct_service"):
             c.execute(create_ct_service)
-        if mysql_check_if_table_exists(con, "ct_mon") == False:
+        if not mysql_check_if_table_exists(con, "ct_mon"):
             c.execute(create_ct_mon)
-
+        if not mysql_check_if_table_exists(con, "ct_states"):
+            c.execute(create_ct_states)
+            ct_states = "INSERT INTO `ct_states` (`state_description`, `state`) VALUES ('OK', 0 )"
+            c.execute(ct_states)
+            ct_states = "INSERT INTO `ct_states` (`state_description`, `state`) VALUES ('FAILED', 1 )"
+            c.execute(ct_states)
+            ct_states = "INSERT INTO `ct_states` (`state_description`, `state`) VALUES ('DELETED', 2 )"
+            c.execute(ct_states)
+            ct_states = "INSERT INTO `ct_states` (`state_description`, `state`) VALUES ('RUNNING', 3 )"
+            c.execute(ct_states)
+            ct_states = "INSERT INTO `ct_states` (`state_description`, `state`) VALUES ('STOPPED', 4 )"
+            c.execute(ct_states)
+            con.commit()
 
     except MySQLdb.Error, e:
         print ""
-        #print "Error %d: %s" % (e.args[0], e.args[1])
-        #sys.exit(1)
+        # print "Error %d: %s" % (e.args[0], e.args[1])
+        # sys.exit(1)
 
-def mysql_insert(con, table, filename, file_state):
+def mysql_insert(con, table, filename, file_state, message):
 
     try:
         timestamp = int(time.time())
-        statement = "INSERT INTO `" + table +"` (`ts`, `file`, `file_state`) VALUES ('" + str(timestamp) + "', '" + filename + "', '" + str(file_state) + "')"
+        statement = "INSERT INTO `" + table +"` (`ts`, `file`, `file_state`, `message`) VALUES ('" + str(timestamp) + "', '" + filename + "', '" + str(file_state) + "', '" + str(message) + "')"
         c = con.cursor()
         c.execute(statement)
         con.commit()
