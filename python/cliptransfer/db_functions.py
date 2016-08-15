@@ -17,31 +17,32 @@ def copyFilesRecursive(con, src, dest, deleteSrc):
         for f in files:
             copyFilesRecursive(con, os.path.join(src, f), os.path.join(dest, f), deleteSrc)
     else:
-
+        ch = mysql_check_entry(con, "ct_log", "file", src)
         try:
-            if not mysql_check_entry(con, "ct_log", "file", src):
+            if not ch:
                 print "copy file " + src + " to " + dest
                 shutil.copyfile(src, dest)
+                shutil.copystat(src, dest)
 
         except shutil.Error as e:
-            mysql_insert(con, "ct_log", src, 1, e)
+            if con:
+                mysql_insert(con, "ct_log", src, 1, e)
             print "Error: %s" % e
 
         except IOError as e:
             print "Error %s" % e.strerror
             mysql_insert(con, "ct_log", src, 1, e.strerror)
+        except OSError as e:
+            print "Error %s" % e.strerror
+            mysql_insert(con, "ct_log", src, 1, e.strerror)
 
         except KeyboardInterrupt:
             print "copy process canceled!"
-            mysql_disconnect(con)
             exit(1)
-
         finally:
-            if not mysql_check_entry(con, "ct_log", "file", src):
-                try:
-                    mysql_insert(con, "ct_log", src, 0, "copied successfully")
-                except MySQLdb.Error, e:
-                    print "Error %d: %s" % (e.args[0], e.args[1])
+            if not ch:
+                mysql_insert(con, "ct_log", src, 0, "copied successfully")
+
         if deleteSrc == 1:
             try:
                 os.remove(src)
@@ -50,7 +51,7 @@ def copyFilesRecursive(con, src, dest, deleteSrc):
 
 
 def cleanup(con, folder, d):
-    i=0
+    i = 0
     for root, directories, filenames in os.walk(folder):
         now = time.time()
         cutoff = now - (int(d) * 86400)
@@ -60,25 +61,25 @@ def cleanup(con, folder, d):
             file = os.path.join(root, filename)
             st = os.stat(file)
             if st.st_mtime < cutoff:
-                i += 1
+
                 try:
                     print "deleting " + file
                     os.remove(file)
+                    i += 1
+                except OSError as e:
+                    print "Error %s" % e.strerror
+                    mysql_insert(con, "ct_log", file, 1, e.strerror)
+
                 except IOError as e:
                     print "Error %s" % e.strerror
-                    try:
-                        mysql_insert(con, "ct_log", file, 1, e.strerror)
-                    except MySQLdb.Error, e:
-                        print "Error %d: %s" % (e.args[0], e.args[1])
+                    mysql_insert(con, "ct_log", file, 1, e.strerror)
 
                 except KeyboardInterrupt:
                     print "deletion process canceled!"
+                    exit(1)
 
                 finally:
-                    try:
-                        mysql_insert(con, "ct_log", file, 2, "deleted successfully")
-                    except MySQLdb.Error, e:
-                        print "Error %d: %s" % (e.args[0], e.args[1])
+                    mysql_insert(con, "ct_log", file, 2, "deleted successfully")
 
     print str(i) + " deleted files"
 
@@ -107,9 +108,12 @@ def mysql_select(con,statement):
     results = cursor.fetchall()
     return results
 
+
 def mysql_check_entry(con, table, col, search):
+    c = []
     stmt = "select " + col + " from " + table + " where file_state=0 AND " + col + " like '%" + search + "%'"
-    c = con.cursor()
+    if con:
+        c = con.cursor()
     try:
         c.execute(stmt)
         result = c.fetchone()
@@ -117,10 +121,12 @@ def mysql_check_entry(con, table, col, search):
             return True
         else:
             return False
+
+    except MySQLdb.ProgrammingError, e:
+        print "Error %d: %s" % (e.args[0], e.args[1])
     except MySQLdb.Error, e:
         print "Error %d: %s" % (e.args[0], e.args[1])
-    except KeyboardInterrupt:
-        print "check_entry process canceled!"
+
 
 def mysql_check_if_table_exists (con, table):
     stmt = "SHOW TABLES LIKE '" + table + "'"
@@ -168,12 +174,15 @@ def mysql_table_setup(con):
 
 def mysql_insert(con, table, filename, file_state, message):
 
-    try:
-        timestamp = int(time.time())
-        statement = "INSERT INTO `" + table +"` (`ts`, `file`, `file_state`, `message`) VALUES ('" + str(timestamp) + "', '" + filename + "', '" + str(file_state) + "', '" + str(message) + "')"
-        c = con.cursor()
-        c.execute(statement)
-        con.commit()
+    if con:
+        try:
+            timestamp = int(time.time())
+            statement = "INSERT INTO `" + table +"` (`ts`, `file`, `file_state`, `message`) VALUES ('" + str(timestamp) + "', '" + filename + "', '" + str(file_state) + "', '" + str(message) + "')"
+            c = con.cursor()
+            c.execute(statement)
+            con.commit()
 
-    except MySQLdb.Error, e:
-        print "Error %d: %s" % (e.args[0], e.args[1])
+        except MySQLdb.Error, e:
+            print "Error %d: %s" % (e.args[0], e.args[1])
+        except MySQLdb.ProgrammingError, e:
+            print "Error %d: %s" % (e.args[0], e.args[1])
