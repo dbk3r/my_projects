@@ -1,13 +1,25 @@
 import MySQLdb
 import sys, os, shutil
 import time
+import ConfigParser
 
+
+def getconfig(configFile, section, option):
+    config = ConfigParser.ConfigParser()
+    config.read(configFile)
+    value = config.get(section, option)
+    return value
 
 def helpme():
     print "tpsadmin.py [copy|move|delete] <src-folder> <dest-folder|days>"
 
+def get_extension(filename):
+    basename = os.path.basename(filename)  # os independent
+    ext = '.'.join(basename.split('.')[1:])
+    return ext if ext else None
 
-def copyFilesRecursive(con, src, dest, deleteSrc):
+
+def copyFilesRecursive(con, src, dest, deleteSrc, allowed_extensions):
 
     if os.path.isdir(src):
         if not os.path.isdir(dest):
@@ -15,11 +27,11 @@ def copyFilesRecursive(con, src, dest, deleteSrc):
 
         files = os.listdir(src)
         for f in files:
-            copyFilesRecursive(con, os.path.join(src, f), os.path.join(dest, f), deleteSrc)
+            copyFilesRecursive(con, os.path.join(src, f), os.path.join(dest, f), deleteSrc, allowed_extensions)
     else:
         ch = mysql_check_entry(con, "ct_log", "file", src)
         try:
-            if not ch:
+            if not ch and get_extension(src) in allowed_extensions:
                 print "copy file " + src + " to " + dest
                 shutil.copyfile(src, dest)
                 shutil.copystat(src, dest)
@@ -35,12 +47,8 @@ def copyFilesRecursive(con, src, dest, deleteSrc):
         except OSError as e:
             print "Error %s" % e.strerror
             mysql_insert(con, "ct_log", src, 1, e.strerror)
-
-        except KeyboardInterrupt:
-            print "copy process canceled!"
-            exit(1)
         finally:
-            if not ch:
+            if not ch and get_extension(src) in allowed_extensions:
                 mysql_insert(con, "ct_log", src, 0, "copied successfully")
 
         if deleteSrc == 1:
@@ -74,10 +82,6 @@ def cleanup(con, folder, d):
                     print "Error %s" % e.strerror
                     mysql_insert(con, "ct_log", file, 1, e.strerror)
 
-                except KeyboardInterrupt:
-                    print "deletion process canceled!"
-                    exit(1)
-
                 finally:
                     mysql_insert(con, "ct_log", file, 2, "deleted successfully")
 
@@ -97,26 +101,54 @@ def mysql_connect(mysql_server, mysql_port, mysql_db, mysql_user, mysql_pass):
         if con:
             return con
 
+def mysql_dbcleanup(con, days):
+    try:
+        cursor = con.cursor()
+        cursor.execute("delete from ct_log where ts < UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL " + str(days) + " DAY))")
+        con.commit()
+        cursor.close()
+    except MySQLdb.Error, e:
+        print "Error %d: %s" % (e.args[0], e.args[1])
 
 def mysql_disconnect(con):
     con.close()
 
 
-def mysql_select(con,statement):
-    cursor = con.cursor()
-    cursor.execute(statement)
-    results = cursor.fetchall()
-    return results
+def mysql_update(con, table, col, value, where_col, where_value):
+
+    try:
+        cursor = con.cursor()
+        cursor.execute("update " + table + " set " + col + "='" + value + "' where " + where_col + "='" + where_value + "'")
+        con.commit()
+        cursor.close()
+
+    except MySQLdb.Error, e:
+        print "Error %d: %s" % (e.args[0], e.args[1])
+    except MySQLdb.ProgrammingError, e:
+        print "mein - Error %d: %s" % (e.args[0], e.args[1])
+
+
+def mysql_select(con, statement):
+
+    try:
+        cursor = con.cursor()
+        cursor.execute(statement)
+        results = cursor.fetchall()
+        cursor.close()
+    finally:
+        return results
 
 
 def mysql_check_entry(con, table, col, search):
     c = []
     stmt = "select " + col + " from " + table + " where file_state=0 AND " + col + " like '%" + search + "%'"
-    if con:
-        c = con.cursor()
+
     try:
+        if con:
+            c = con.cursor()
         c.execute(stmt)
         result = c.fetchone()
+        c.close()
         if result:
             return True
         else:
@@ -133,6 +165,7 @@ def mysql_check_if_table_exists (con, table):
     c = con.cursor()
     c.execute(stmt)
     result = c.fetchone()
+    c.close()
     if result:
         return True
     else:
@@ -144,6 +177,7 @@ def mysql_table_setup(con):
     c = con.cursor()
     create_finished = "CREATE TABLE IF NOT EXISTS `ct_log` (`ID` int(11) unsigned NOT NULL auto_increment,`ts` varchar(255), `file` MEDIUMTEXT , `file_state` tinyint(1), `message` MEDIUMTEXT, PRIMARY KEY  (`ID`))"
     create_ct_states = "CREATE TABLE IF NOT EXISTS `ct_states` (`ID` int(11) unsigned NOT NULL auto_increment,`state_description` varchar(255), `state` tinyint(1), PRIMARY KEY  (`ID`))"
+    create_ct_failover = "CREATE TABLE IF NOT EXISTS `ct_failover` (`ID` int(11) unsigned NOT NULL auto_increment,`active_mountpoint` varchar(255), PRIMARY KEY  (`ID`))"
     create_ct_service = "CREATE TABLE IF NOT EXISTS `ct_service` (`ID` int(11) unsigned NOT NULL auto_increment, `ts` varchar(255), `service` varchar(255) NOT NULL default '', `service_state` tinyint(1), PRIMARY KEY  (`ID`))"
     create_ct_mon = "CREATE TABLE IF NOT EXISTS `ct_mon` (`ID` int(11) unsigned NOT NULL auto_increment, `ts` varchar(255), `file` MEDIUMTEXT, `file_state` tinyint(1), `file_op_error` MEDIUMTEXT, PRIMARY KEY  (`ID`))"
     try:
@@ -153,6 +187,11 @@ def mysql_table_setup(con):
             c.execute(create_ct_service)
         if not mysql_check_if_table_exists(con, "ct_mon"):
             c.execute(create_ct_mon)
+        if not mysql_check_if_table_exists(con, "ct_failover"):
+            c.execute(create_ct_failover)
+            ct_states = "INSERT INTO `ct_failover` (`active_mountpoint`) VALUES ('" + getconfig("tpsadm.cfg", "mountpoints", "main") + "')"
+            c.execute(ct_states)
+            con.commit()
         if not mysql_check_if_table_exists(con, "ct_states"):
             c.execute(create_ct_states)
             ct_states = "INSERT INTO `ct_states` (`state_description`, `state`) VALUES ('OK', 0 )"
@@ -167,11 +206,13 @@ def mysql_table_setup(con):
             c.execute(ct_states)
             con.commit()
 
+
     except MySQLdb.Error, e:
         print ""
         # print "Error %d: %s" % (e.args[0], e.args[1])
         # sys.exit(1)
 
+    c.close()
 def mysql_insert(con, table, filename, file_state, message):
 
     if con:
@@ -181,8 +222,17 @@ def mysql_insert(con, table, filename, file_state, message):
             c = con.cursor()
             c.execute(statement)
             con.commit()
+            c.close()
+
 
         except MySQLdb.Error, e:
             print "Error %d: %s" % (e.args[0], e.args[1])
         except MySQLdb.ProgrammingError, e:
             print "Error %d: %s" % (e.args[0], e.args[1])
+
+def handler(signum,frame):
+    sys.exit(0)
+
+def prepareExit(con,service):
+    mysql_update(con, "ct_service", "service_state", "5", "service", service)
+    mysql_disconnect(con)

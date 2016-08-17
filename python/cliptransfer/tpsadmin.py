@@ -1,46 +1,68 @@
 #!/usr/bin/python
 
 import os, sys, time
-
+import signal
 from db_functions import *
 
-mysql_connection = mysql_connect("sp-tpsdock01", 3900, "adm_mon", "adm_mon", "adm")
+
+mysql_server = getconfig("tpsadm.cfg", "mysql", "server")
+mysql_db = getconfig("tpsadm.cfg", "mysql", "db")
+mysql_port = int(getconfig("tpsadm.cfg", "mysql", "port"))
+mysql_user = getconfig("tpsadm.cfg", "mysql", "user")
+mysql_passwd = getconfig("tpsadm.cfg", "mysql", "passwd")
+
+mysql_connection = mysql_connect(mysql_server, mysql_port, mysql_db, mysql_user, mysql_passwd)
 mysql_table_setup(mysql_connection)
-mysql_disconnect(mysql_connection)
+
+service = sys.argv[1]
+
+allowed_extensions = []
+if service == "ct_Standbilder":
+    allowed_extensions = ['tiff']
+elif service == "ct_Videos":
+    allowed_extensions = ['mp4', 'mxf']
+
+signal.signal(signal.SIGINT, handler)
+signal.signal(signal.SIGTERM, handler)
 
 try:
     while True:
-        mysql_connection = mysql_connect("sp-tpsdock01", 3900, "adm_mon", "adm_mon", "adm")
+        mysql_update(mysql_connection, "ct_service", "service_state", "4", "service", service)
         if len(sys.argv) >= 3:
-            command = sys.argv[1]
+
+            command = sys.argv[2]
 
             if command == "copy":
-                dest = sys.argv[3]
-                src = sys.argv[2]
-                try:
-                    copyFilesRecursive(mysql_connection, src, dest, 0)
-                except KeyboardInterrupt:
-                    print "Operation canceled!"
-                    exit(1)
+                dest = sys.argv[4]
+                src = sys.argv[3]
+                mountpoint = mysql_select(mysql_connection, "select active_mountpoint from ct_failover where id=1")
+                destination = mountpoint[0][0] + "/" + dest
+
+                copyFilesRecursive(mysql_connection, src, destination, 0, allowed_extensions)
 
             elif command == "move":
-                dest = sys.argv[3]
-                src = sys.argv[2]
-                # copyFilesRecursive(mysql_connection, src, dest, 1)
+                dest = sys.argv[4]
+                src = sys.argv[3]
+                # copyFilesRecursive(mysql_connection, src, dest, 1, allowed_extensions)
 
             elif command == "cleanup":
-                days = sys.argv[3]
-                src = sys.argv[2]
+                days = sys.argv[4]
+                src = sys.argv[3]
                 cleanup(mysql_connection, src, days)
+                break
+
+            elif command == "db_cleanup":
+                days = sys.argv[3]
+                mysql_dbcleanup(mysql_connection, days)
+                break
 
             else:
                 helpme()
         else:
             helpme()
 
-        time.sleep(4)
-        mysql_disconnect(mysql_connection)
 
-except KeyboardInterrupt:
-    print "Process Canceled!"
-    exit(1)
+        time.sleep(4)
+finally:
+    prepareExit(mysql_connection, service)
+    print "exit"
