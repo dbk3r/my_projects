@@ -10,8 +10,17 @@ def getconfig(configFile, section, option):
     value = config.get(section, option)
     return value
 
+
 def helpme():
-    print "tpsadmin.py [copy|move|delete] <src-folder> <dest-folder|days>"
+    print "tpsadmin.py [SERVICE <ct_Standbilder|ct_Videos|ct_cleanup>] [active|copy|move|cleanup|dbcleanup] <src-folder> <dest-folder|days>"
+    print ""
+    print "EXAMPLES: "
+    print ""
+    print "start service ct_Standbilder : python tpsadmin.py ct_Standbilder copy /mnt/sp-fbp-ist01/Standbilder Standbilder (/etc/init.d/ct_Stanbilder start)"
+    print "file cleanup                 : python tpsadmin.py ct_cleanup cleanup /mnt/sp-fbp-ist01/Standbilder 7 (will delete all files in given mountpoint, older than 7 days)"
+    print "db cleanup                   : python tpsadmin.py adm dbcleanup 7  (will delete all DB Rows older than 7 days)"
+    print "set active mountpoint        : python tpsadmin.py adm active /mnt/sb-isis01"
+
 
 def get_extension(filename):
     basename = os.path.basename(filename)  # os independent
@@ -56,6 +65,22 @@ def copyFilesRecursive(con, src, dest, deleteSrc, allowed_extensions):
                 os.remove(src)
             except IOError as e:
                 print "Error %s" % e.strerror
+
+
+def set_active_mountpoint(con, mountpoint):
+    mysql_update(con, "ct_failover", "active_mountpoint", mountpoint, "id", "1")
+
+
+def failover(con, dest, main, backup):
+    active_mountpoint = mysql_select(con, "select active_mountpoint from ct_failover where id='1'")
+    if not os.path.isdir(active_mountpoint[0][0] + "/" + dest + "/BA"):
+        print active_mountpoint[0][0] + " not available"
+        if active_mountpoint[0][0] == main:
+            print "set " + backup + " active"
+            set_active_mountpoint(con, backup)
+        elif active_mountpoint[0][0] == backup:
+            print "set " + main + " active"
+            set_active_mountpoint(con, main)
 
 
 def cleanup(con, folder, d):
@@ -213,6 +238,8 @@ def mysql_table_setup(con):
         # sys.exit(1)
 
     c.close()
+
+
 def mysql_insert(con, table, filename, file_state, message):
 
     if con:
