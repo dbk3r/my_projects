@@ -1,0 +1,18 @@
+'''
+Created on 13.09.2016
+
+@author: db002-a
+'''
+
+def test(text):
+    print text  
+
+if __name__ == '__main__':
+    print "Hallo"
+    test("das ist ein test")
+    
+    
+  
+    
+    
+    

@@ -1,0 +1,8 @@
+'''
+Created on 13.09.2016
+
+@author: db002-a
+'''
+
+if __name__ == '__main__':
+    print "Hallo"

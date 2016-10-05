@@ -2,7 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/cliptransfer.iml" filepath="$PROJECT_DIR$/.idea/cliptransfer.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/Clip-Transfer.iml" filepath="$PROJECT_DIR$/.idea/Clip-Transfer.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../xworker/.idea/xworker.iml" filepath="$PROJECT_DIR$/../xworker/.idea/xworker.iml" />
     </modules>
   </component>
 </project>

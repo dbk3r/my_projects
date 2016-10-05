@@ -4,6 +4,41 @@ import time
 import ConfigParser
 
 
+def is_encoding(filepath):
+    encoding = None
+    path = os.path.dirname(filepath)
+    file = os.path.basename(filepath)
+
+    amberfin_lockfile = path + "/amberfin_" + file + "_trans.lck"
+    if os.path.isfile(amberfin_lockfile):
+        print filepath + " still encoding!"
+        encoding = True
+    else:
+        encoding = False
+
+    return encoding
+
+
+def is_locked(filepath):
+    locked = None
+    file_object = None
+    if os.path.exists(filepath):
+        try:
+            buffer_size = 8
+            file_object = open(filepath, 'a', buffer_size)
+            if file_object:
+                locked = False
+        except IOError, message:
+            print "File is in use %s." % message
+            locked = True
+        finally:
+            if file_object:
+                file_object.close()
+    else:
+        print "%s not found." % filepath
+    return locked
+
+
 def getconfig(configFile, section, option):
     config = ConfigParser.ConfigParser()
     config.read(configFile)
@@ -24,8 +59,8 @@ def helpme():
 
 def get_extension(filename):
     basename = os.path.basename(filename)  # os independent
-    ext = '.'.join(basename.split('.')[1:])
-    return ext if ext else None
+    extension = os.path.splitext(basename)[1][1:]
+    return extension if extension else None
 
 
 def copyFilesRecursive(con, src, dest, deleteSrc, allowed_extensions):
@@ -40,7 +75,7 @@ def copyFilesRecursive(con, src, dest, deleteSrc, allowed_extensions):
     else:
         ch = mysql_check_entry(con, "ct_log", "file", src)
         try:
-            if not ch and get_extension(src) in allowed_extensions:
+            if not ch and get_extension(src) in allowed_extensions and not is_encoding(src):
                 print "copy file " + src + " to " + dest
                 shutil.copyfile(src, dest)
                 shutil.copystat(src, dest)
@@ -57,7 +92,7 @@ def copyFilesRecursive(con, src, dest, deleteSrc, allowed_extensions):
             print "Error %s" % e.strerror
             mysql_insert(con, "ct_log", src, 1, e.strerror)
         finally:
-            if not ch and get_extension(src) in allowed_extensions:
+            if not ch and get_extension(src) in allowed_extensions and not is_encoding(src):
                 mysql_insert(con, "ct_log", src, 0, "copied successfully")
 
         if deleteSrc == 1:
@@ -153,13 +188,17 @@ def mysql_update(con, table, col, value, where_col, where_value):
         print "mein - Error %d: %s" % (e.args[0], e.args[1])
 
 
+
 def mysql_select(con, statement):
 
     try:
         cursor = con.cursor()
-        cursor.execute(statement)
-        results = cursor.fetchall()
-        cursor.close()
+        if cursor:
+            cursor.execute(statement)
+            results = cursor.fetchall()
+            # cursor.close()
+    except MySQLdb.Error, e:
+        print "Error %d: %s" % (e.args[0], e.args[1])
     finally:
         return results
 
@@ -200,14 +239,27 @@ def mysql_check_if_table_exists (con, table):
 def mysql_table_setup(con):
 
     c = con.cursor()
-    create_finished = "CREATE TABLE IF NOT EXISTS `ct_log` (`ID` int(11) unsigned NOT NULL auto_increment,`ts` varchar(255), `file` MEDIUMTEXT , `file_state` tinyint(1), `message` MEDIUMTEXT, PRIMARY KEY  (`ID`))"
+    create_log = "CREATE TABLE IF NOT EXISTS `ct_log` (`ID` int(11) unsigned NOT NULL auto_increment,`ts` varchar(255), `file` MEDIUMTEXT , `file_state` tinyint(1), `message` MEDIUMTEXT, PRIMARY KEY  (`ID`))"
+    create_xjobs = "CREATE TABLE IF NOT EXISTS `adm_xjobs` (`ID` int(11) unsigned NOT NULL auto_increment,`ts` varchar(50), `job_type` varchar(50) , `job` MEDIUMTEXT , `response` MEDIUMTEXT , `job_state` tinyint(1) , `job_progress` int(3) , PRIMARY KEY  (`ID`))"
     create_ct_states = "CREATE TABLE IF NOT EXISTS `ct_states` (`ID` int(11) unsigned NOT NULL auto_increment,`state_description` varchar(255), `state` tinyint(1), PRIMARY KEY  (`ID`))"
     create_ct_failover = "CREATE TABLE IF NOT EXISTS `ct_failover` (`ID` int(11) unsigned NOT NULL auto_increment,`active_mountpoint` varchar(255), PRIMARY KEY  (`ID`))"
     create_ct_service = "CREATE TABLE IF NOT EXISTS `ct_service` (`ID` int(11) unsigned NOT NULL auto_increment, `ts` varchar(255), `service` varchar(255) NOT NULL default '', `service_state` tinyint(1), PRIMARY KEY  (`ID`))"
     create_ct_mon = "CREATE TABLE IF NOT EXISTS `ct_mon` (`ID` int(11) unsigned NOT NULL auto_increment, `ts` varchar(255), `file` MEDIUMTEXT, `file_state` tinyint(1), `file_op_error` MEDIUMTEXT, PRIMARY KEY  (`ID`))"
+    create_ct_config = "CREATE TABLE IF NOT EXISTS `ct_config` (`ID` int(11) unsigned NOT NULL auto_increment,`cfg_section` varchar(255), `cfg_option` varchar(255), `cfg_value` varchar(255), PRIMARY KEY  (`ID`))"
     try:
+        if not mysql_check_if_table_exists(con, "ct_config"):
+            c.execute(create_ct_config)
+            ct_config = "INSERT INTO `ct_config` (`cfg_section`, `cfg_option`, `cfg_value`) VALUES ('general', 'pause', '5' )"
+            c.execute(ct_config)
+            ct_config = "INSERT INTO `ct_config` (`cfg_section`, `cfg_option`, `cfg_value`) VALUES ('mountpoints', 'main', '/mnt/sp-isis01' )"
+            c.execute(ct_config)
+            ct_config = "INSERT INTO `ct_config` (`cfg_section`, `cfg_option`, `cfg_value`) VALUES ('mountpoints', 'backup', '/mnt/sb-isis01' )"
+            c.execute(ct_config)
+
         if not mysql_check_if_table_exists(con, "ct_log"):
-            c.execute(create_finished)
+            c.execute(create_log)
+        if not mysql_check_if_table_exists(con, "adm_xjobs"):
+            c.execute(create_xjobs)
         if not mysql_check_if_table_exists(con, "ct_service"):
             c.execute(create_ct_service)
         if not mysql_check_if_table_exists(con, "ct_mon"):
@@ -246,11 +298,11 @@ def mysql_insert(con, table, filename, file_state, message):
         try:
             timestamp = int(time.time())
             statement = "INSERT INTO `" + table +"` (`ts`, `file`, `file_state`, `message`) VALUES ('" + str(timestamp) + "', '" + filename + "', '" + str(file_state) + "', '" + str(message) + "')"
-            c = con.cursor()
+            #print statement
+	    c = con.cursor()
             c.execute(statement)
             con.commit()
             c.close()
-
 
         except MySQLdb.Error, e:
             print "Error %d: %s" % (e.args[0], e.args[1])
@@ -261,5 +313,5 @@ def handler(signum,frame):
     sys.exit(0)
 
 def prepareExit(con,service):
-    mysql_update(con, "ct_service", "service_state", "5", "service", service)
+    mysql_update(con, "ct_service", "service_state", "4", "service", service)
     mysql_disconnect(con)

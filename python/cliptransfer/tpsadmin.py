@@ -4,18 +4,21 @@ import os, sys, time
 import signal
 from db_functions import *
 
+config_file = "/var/lib/scripts/Clip-Transfer/tpsadm.cfg"
 
-mysql_server = getconfig("tpsadm.cfg", "mysql", "server")
-mysql_db = getconfig("tpsadm.cfg", "mysql", "db")
-mysql_port = int(getconfig("tpsadm.cfg", "mysql", "port"))
-mysql_user = getconfig("tpsadm.cfg", "mysql", "user")
-mysql_passwd = getconfig("tpsadm.cfg", "mysql", "passwd")
+mysql_server = getconfig(config_file, "mysql", "server")
+mysql_db = getconfig(config_file, "mysql", "db")
+mysql_port = int(getconfig(config_file, "mysql", "port"))
+mysql_user = getconfig(config_file, "mysql", "user")
+mysql_passwd = getconfig(config_file, "mysql", "passwd")
 
 mysql_connection = mysql_connect(mysql_server, mysql_port, mysql_db, mysql_user, mysql_passwd)
 mysql_table_setup(mysql_connection)
 
-main_mountpoint = getconfig("tpsadm.cfg", "mountpoints", "main")
-backup_mountpoint = getconfig("tpsadm.cfg", "mountpoints", "backup")
+main_mountpoint = getconfig(config_file, "mountpoints", "main")
+backup_mountpoint = getconfig(config_file, "mountpoints", "backup")
+
+pause = int(getconfig(config_file, "general", "pause"))
 
 service = sys.argv[1]
 command = sys.argv[2]
@@ -31,7 +34,8 @@ signal.signal(signal.SIGTERM, handler)
 
 try:
     while True:
-        mysql_update(mysql_connection, "ct_service", "service_state", "4", "service", service)
+        pause = mysql_select(mysql_connection, "select cfg_value from ct_config where cfg_section='general' and cfg_option='pause'")
+        mysql_update(mysql_connection, "ct_service", "service_state", "3", "service", service)
         if len(sys.argv) >= 3:
 
             if command == "copy":
@@ -70,7 +74,8 @@ try:
             break
 
 
-        time.sleep(4)
+        time.sleep(float(pause[0][0]))
 finally:
+    time.sleep(2)
     prepareExit(mysql_connection, service)
     print "exit"
