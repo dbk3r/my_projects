@@ -1,0 +1,37 @@
+
+25.06.2017
+
+- Wartungsansicht Letzte Einträge -> zeigt nun alle Kommentare der vorhanden Wartungsfenster
+
+24.06.2017
+
+- Das Anhängen von Bilddatein an den Wartungsdatensatz ist nun möglich. Per Upload Knopf (Datei hinzufügen)
+
+23.06.2017
+
+- Versand von Wartungsmails ist nun möglich, unter Einstellungen->Wartung->Wartungsmails können verschiedene Templates erstellt werden.
+
+22.05.2017
+
+- Einfügen des aktuellen Datum + Uhrzeit im Wartungstextfeld mittels CTRL+.
+- Status 'in Arbeit' in der Wartungs Kw Ansicht hinzugefügt. Farbe Orange
+- Status 'pausiert' in der Wartungs Kw Ansicht hinzugefügt. Farbe Braun.
+
+12.05.2017
+
+- Kalenderwoche kann jetzt in der Wartungsplan ausgewählt werden
+- Wartungshistorie in der Inventdetailanzeige standardmäßig versteckt. Anzeige Kann getoggelt werden.
+
+04.05.2017
+
+- Wartungsgruppen Statusanzeige (Ampelfarben) in KW Anzeige hinzugefügt.
+- Bug fixing
+
+26.04.2017
+
+- Wartungsgruppen Bearbeitungsdialog kann nun idrekt aus den Suchergebnissen und aus dem Inventar Bearbeitendialog geöffnet werden
+
+25.04.2015
+
+- Wartungshistorie im Inventar Dialog wird nun angezeigt
+- KW Dialog kann nun aus der Einzeldarstellung aufgerufen werden
