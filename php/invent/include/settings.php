@@ -272,11 +272,11 @@
               <tr><td>Absender</td><td><input class="textfield" id="newmail-absender" value="vpms-admin@rbb-online.de"></td></tr>
               <tr><td>Empfänger</td><td><input class="textfield" id="newmail-empfaenger" value="cvd-brandenburg-aktuell@rbb-online.de,ai-potsdam@rbb-online.de,Abendschau@rbb-online.de,mazberlin@rbb-online.de,Zibb@rbb-online.de,cutvd-berlin@rbb-online.de,cutvd-potsdam@rbb-online.de"></td></tr>
               <tr><td>Betreff</td><td><input class="textfield" id="newmail-kopf" value="Info zum aktuellen VPMS-Wartungsfenster"></td></tr>
-              <tr><td colspan="2"><textarea id="newmail-text" class="textfield" rows="3" placeholder="Mail Text"></textarea></td></tr>
+              <tr><td colspan="2"><textarea id="newmail-text" class="textfield" rows="6" placeholder="Mail Text"></textarea></td></tr>
               <tr><td colspan="2" align="right"><button id="new" class="smail-button">hinzufügen</button></td></tr>
             </table><br><hr><br>
 
-            <div class="set-box" id="div-maintmail">
+            <!-- <div class="set-box" id="div-maintmail"> -->
             <?php
               $sql = "select * from maintmails";
               $results = $connection->query($sql);
@@ -288,7 +288,7 @@
                     <tr><td>Absender</td><td><input class='textfield' id='mail-absender-". $row['uuid'] ."' value='". $row['mailabsender'] ."'></td></tr>
                     <tr><td>Empfänger</td><td><input class='textfield' id='mail-empfaenger-". $row['uuid'] ."' value='". $row['mailempfaenger'] ."'></td></tr>
                     <tr><td>Betreff</td><td><input class='textfield' id='mail-kopf-". $row['uuid'] ."' value='". $row['mailkopf'] ."'></td></tr>
-                    <tr><td colspan='2'><textarea id='mail-text-". $row['uuid'] ."' class='textfield' rows='3' placeholder='Mail Text'>". $row['mailtext'] ."</textarea></td></tr>
+                    <tr><td colspan='2'><textarea id='mail-text-". $row['uuid'] ."' class='textfield' rows='6' placeholder='Mail Text'>". $row['mailtext'] ."</textarea></td></tr>
                     <tr><td colspan='2' align='right'><button id='save' uuid='". $row['uuid'] ."' class='smail-button'>speichern</button><button id='delete' uuid='". $row['uuid'] ."' class='smail-button'>löschen</button></td></tr>
                 ";
                 echo "</table></div>";
@@ -296,7 +296,7 @@
               }
             ?>
             </div>
-          </div>
+          <!--</div> -->
 
         </div>
     </div>

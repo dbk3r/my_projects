@@ -1,3 +1,6 @@
+28.06.2017
+
+- Anzeige der vergangenen Wartungseinträge nun in der Kalenderwochenansicht möglich
 
 25.06.2017
 

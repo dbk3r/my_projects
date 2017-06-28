@@ -44,6 +44,25 @@ function insertreplace(state,info,kw,uuid) {
 
 $(document).ready( function() {
 
+
+	$(".box-header-btn").click(function() {
+
+	    var up = "/invent/img/up.png";
+	    var down = "/invent/img/down.png";
+	    var src = $(this).attr('src');
+	    if(src == up){
+				$(this).attr('src',down);
+				$("#maint-history-"+$(this).attr("uuid")).html("");
+				$('#title-'+$(this).attr("uuid")).prop('title', 'zeige vergange Einträge');
+			}
+	    else {
+				$(this).attr('src',up);
+
+				$("#maint-history-"+$(this).attr("uuid")).load("include/sub-wartung-srv.php?uuid="+$(this).attr("uuid"));
+				$('#title-'+$(this).attr("uuid")).prop('title', 'verberge vergange Einträge');
+			}
+	});
+
 	$('.upload_content').hover(function(){
     $(this).find('.close').animate({opacity:1},200)
 	},function(){$(this).find('.close').animate({opacity:0},200)

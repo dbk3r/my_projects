@@ -14,6 +14,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <title>TPS Invent</title>
   <meta charset="utf-8"/>
   <link rel="stylesheet" href="css/tree.css"></link>
   <link rel="stylesheet" href="css/design.css"></link>

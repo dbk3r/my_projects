@@ -58,6 +58,9 @@ while ($row = $results->fetchArray()) {
   echo "</div></td>";
   echo "</table>";
   echo  "</td></tr>";
+  echo "<tr><td colspan=6 align='center'><img id='title-". $row['uuid'] ."' title='zeige vergange Wartungseinträge' class='box-header-btn' uuid='". $row['uuid'] ."' src='/invent/img/down.png'></td></tr>";
+  echo "<tr><td colspan=6 align='center'><div class='maint-history-box' id='maint-history-". $row['uuid'] ."' ></div></td></tr>";
+  echo "<tr><td colspan=6 align='center'><hr class=trenner></td></tr>";
 }
 
 

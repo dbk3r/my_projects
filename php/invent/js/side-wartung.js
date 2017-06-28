@@ -7,7 +7,7 @@ $(document).ready( function() {
     $("#kw-ansicht").load('include/kw-ansicht.php', {'kw': this.value});
   });
 
-  $("#sendmail").click(function(event) {
+  $(".smail-button").click(function(event) {
     event.stopImmediatePropagation();
 
       $.post("include/db_execute.php",

@@ -32,7 +32,22 @@ if ($action == "sendmail") {
     'Content-Type: text/html; charset="UTF-8";',
     'From: <'. $mr['mailabsender'] .'>',
   );
-  $text = str_replace("\n", "<br>", $mr['mailtext']);
+  $text = "<html>";
+  $text = $text . "<head>
+                        <style>
+                        .infobox {
+                          -webkit-box-shadow: 10px 10px 5px 0px rgba(148,132,148,1);
+                          -moz-box-shadow: 10px 10px 5px 0px rgba(148,132,148,1);
+                          box-shadow: 10px 10px 5px 0px rgba(148,132,148,1);
+                          width:100%;
+                          text-align:center;
+                        }
+                        </style>
+                        </head><body>";
+  $text = $text .  str_replace("\n", "<br>", $mr['mailtext']);
+  $text = $text . "</body></html>";
+
+
 
   mail($mr['mailempfaenger'], $mr['mailkopf'], $text, implode("\n", $headers));
   $result = " Mail wurde gesendet!\n";

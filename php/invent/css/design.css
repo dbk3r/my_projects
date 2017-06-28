@@ -223,6 +223,12 @@ a:visited{ color: #444;}
   font: normal 11px Arial;
 }
 
+.maint-history-box{
+  max-height: 300px;
+  padding: 5px;
+  overflow:auto;
+
+}
 
 .invent-row:hover {
   cursor: pointer;
