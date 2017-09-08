@@ -24,7 +24,7 @@ $connection->busyTimeout(5000);
     $results = $connection->query($sql);
     while ($row = $results->fetchArray()) {
       if ($row['mstate'] == '2') { $state="green"; $title= "erledigt"; }
-      elseif ($row['mstate'] == '3') { $state = "red" ; $title= "fehlgeschlagen";}
+      elseif ($row['mstate'] == '3') { $state = "red" ; $title= "wichtig";}
       elseif ($row['mstate'] == '4') { $state="yellow";$title= "offen";}
       elseif ($row['mstate'] == '5') { $state="brown";$title= "pausiert";}
       elseif ($row['mstate'] == '6') { $state="orange";$title= "in Arbeit";}

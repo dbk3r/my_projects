@@ -1,6 +1,12 @@
 
 
 <?php
+
+  $browser = $_SERVER['HTTP_USER_AGENT'];
+  if(preg_match('/11.0/i', $browser)) {
+      print "<script> alert('Sie benutzen möglicherweise den Internet Explorer. Dieser wir derzeit nicht von dieser Anwendung unterstützt!');</script>";
+  }
+
   include_once "include/config.php";
   include_once "include/db_functions.php";
   $connection = sqlite_connect($sqlite_db);

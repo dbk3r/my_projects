@@ -41,6 +41,7 @@ $sql ="CREATE TABLE uploads
   (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
   uuid CHAR(128),
   refid CHAR(128),
+  kw INT,
   filename CHAR(255));";
 $connection->exec($sql);
 
